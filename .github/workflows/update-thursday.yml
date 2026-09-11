@@ -1,0 +1,48 @@
+name: One-time Thursday itinerary sync
+
+on:
+  push:
+    paths:
+      - '.github/workflows/update-thursday.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch Thursday HTML
+        shell: python
+        run: |
+          from pathlib import Path
+
+          path = Path('index.html')
+          text = path.read_text()
+
+          if 'Alternative — Pechanga The Cove swim-up bar' in text:
+              raise SystemExit('Thursday Pechanga alternative is already present.')
+
+          anchor = '<div class="activity"><div class="content"><div class="time">5:45–6:30 PM</div><h3>Altísima Winery arrival + golden-hour transition</h3>'
+          pechanga = '''<div class="activity"><div class="content"><div class="time">12:15–5:45 PM</div><h3>Alternative — Pechanga The Cove swim-up bar</h3><p>Instead of the Oak Mountain lunch, cave tour, and vineyard decompression blocks above, we&#x27;ll drive from Doffo to Pechanga, spend the afternoon at the 4.5-acre pool oasis, then continue to Altísima before the evening event. The Cove closes at 5:00 PM, so that is our hard poolside cutoff.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=45000+Pechanga+Parkway+Temecula+CA+92592" target="_blank" rel="noopener">📍 Pechanga The Cove · 45000 Pechanga Parkway, Temecula, CA 92592</a><span class="travel">🚗 30 min from Doffo · 20 min to Altísima</span></div><div class="pills"><span class="pill info">Alternative afternoon · replaces Oak Mountain lunch + cave tour + vineyard decompression</span><span class="pill alert">Hard poolside cutoff · The Cove closes at 5:00 PM</span></div></div><div class="media"><img src="https://pechanga.net/28-02-2024-11-04-53-pm-2555806.png" alt="Alternative — Pechanga The Cove swim-up bar" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1572331165267-854da2b10ccc?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
+          if anchor not in text:
+              raise SystemExit('Could not find Altísima anchor in index.html')
+          text = text.replace(anchor, pechanga + anchor, 1)
+
+          old = '<span class="travel">🚗 10 min drive</span></div></div><div class="media"><img src="https://gogrape.com/static/upload/wiki/1024x683_Altisima.jpg" alt="Altísima Winery arrival + golden-hour transition"'
+          new = '<span class="travel">🚗 10 min from Oak Mountain · 20 min from Pechanga</span></div></div><div class="media"><img src="https://gogrape.com/static/upload/wiki/1024x683_Altisima.jpg" alt="Altísima Winery arrival + golden-hour transition"'
+          if old not in text:
+              raise SystemExit('Could not find Altísima travel-time string')
+          text = text.replace(old, new, 1)
+
+          path.write_text(text)
+      - name: Commit updated itinerary
+        run: |
+          git config user.name "trip-plan-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Update Thursday with Pechanga alternative"
+          git push
