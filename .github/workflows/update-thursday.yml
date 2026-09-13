@@ -1,4 +1,4 @@
-name: Sync confirmed reservations
+name: Sync audited reservations
 
 on:
   push:
@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Mark confirmed reservations in itinerary
+      - name: Sync confirmed reservations from trip plan
         shell: python
         run: |
           from pathlib import Path
@@ -24,6 +24,7 @@ jobs:
           path = Path('index.html')
           text = path.read_text()
 
+          # Confirmations explicitly documented in the Notion trip plan / supplied confirmations.
           replacements = {
               'Reservation required · 7:15 PM target · dinner daily 4:30–8:30 PM · 858-454-5888':
                   'Reservation confirmed · Fri Sep 18 · 7:15 PM · 2 guests · standard seating',
@@ -31,6 +32,8 @@ jobs:
                   'Reservation confirmed · Sat Sep 19 · 12:30 PM · 2 guests · standard seating',
               'Reservation required · 9:00 PM target · 619-814-2002':
                   'Reservation confirmed · Sat Sep 19 · 9:00 PM · 2 guests · table seating',
+              'Reservation required · 2:35 PM pickup · 2 pedal bikes · Friday 9 AM–9 PM · advance booking saves 10% · 619-342-7244':
+                  '✅ BOOKED · Fri Sep 18 · 2:35 PM pickup · 2 Cruiser Bikes · Half Day (up to 4 hours) · $50.40 paid · arrive early · parking limited',
           }
 
           changed = False
@@ -41,15 +44,31 @@ jobs:
               elif new not in text:
                   raise SystemExit(f'Could not find expected reservation text: {old}')
 
+          # Reservation audit: these remain pending because the Notion plan says to treat
+          # restaurant/tour/ticket items as unbooked until an explicit confirmation exists.
+          pending_markers = [
+              'Campfire — first-night dinner',
+              'Jeune et Jolie — French date night',
+              'The Cave Restaurant at Oak Mountain — wine-country lunch',
+              'Oak Mountain Cave Wine Tasting Tour',
+              'Noches de Altísima — Latin Jazz',
+              'Night Hawk — open-air Greek date night',
+              'NOVA SD — Time Machine',
+              'Puesto La Jolla — final lunch',
+          ]
+          for marker in pending_markers:
+              if marker not in text:
+                  raise SystemExit(f'Audit marker missing from itinerary: {marker}')
+
           if not changed:
-              raise SystemExit('Reservations are already up to date.')
+              raise SystemExit('Reservation audit is already fully synced.')
 
           path.write_text(text)
 
-      - name: Commit itinerary updates
+      - name: Commit audited itinerary to main
         run: |
           git config user.name "trip-plan-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Mark Duke's, Teleferic and Rooftop reservations confirmed"
-          git push
+          git commit -m "Sync full reservation audit to itinerary"
+          git push origin main
