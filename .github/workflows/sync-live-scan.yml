@@ -1,21 +1,25 @@
-name: Sync Wednesday Live Scan
+name: Preserve Wednesday Live Scan
 
 on:
-  push:
-    paths:
-      - '.github/workflows/sync-live-scan.yml'
+  workflow_run:
+    workflows:
+      - 'Sync Notion itinerary'
+    types:
+      - completed
+  workflow_dispatch:
 
 permissions:
   contents: write
 
 jobs:
   update:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Update Wednesday fingerprint stop
+      - name: Preserve confirmed Wednesday Live Scan stop
         shell: python
         run: |
           from pathlib import Path
@@ -31,26 +35,30 @@ jobs:
 
           new_breakfast = '''<div class="activity no-media"><div class="content"><div class="time">10:00 AM–12:45 PM</div><h3>Breakfast + flexible Carlsbad time</h3><p>We'll have a slow breakfast and let the morning breathe instead of cramming in another attraction. This is our official window for coffee, wandering, and pretending we don't have a timeshare presentation later.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1901+Wright+Pl+Carlsbad+CA+92008" target="_blank" rel="noopener">📍 Home2 Suites by Hilton Carlsbad · 1901 Wright Pl, Carlsbad, CA 92008</a><span class="travel">🚗 ≈10 min from The UPS Store Village Faire</span></div></div></div>'''
 
+          changed = False
           if old_fingerprint in text:
               text = text.replace(old_fingerprint, new_fingerprint)
+              changed = True
           elif new_fingerprint not in text:
               raise SystemExit('Fingerprint block not found')
 
           if old_breakfast in text:
               text = text.replace(old_breakfast, new_breakfast)
+              changed = True
           elif new_breakfast not in text:
               raise SystemExit('Breakfast block not found')
 
-          path.write_text(text)
+          if changed:
+              path.write_text(text)
 
-      - name: Commit update
+      - name: Commit if needed
         run: |
           if git diff --quiet -- index.html; then
-            echo "Already current."
+            echo "Live Scan stop already current."
             exit 0
           fi
           git config user.name "trip-plan-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Update Wednesday Live Scan stop"
+          git commit -m "Preserve Wednesday Live Scan stop"
           git push origin main
