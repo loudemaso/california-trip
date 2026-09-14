@@ -15,12 +15,13 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Update Wednesday fingerprint stop and persistent sync
+      - name: Update Wednesday fingerprint stop
         shell: python
         run: |
           from pathlib import Path
 
-          files = [Path('index.html'), Path('.github/workflows/update-thursday.yml')]
+          path = Path('index.html')
+          text = path.read_text()
 
           old_fingerprint = '''<div class="activity no-media"><div class="content"><div class="time">8:50–10:00 AM</div><h3>California sales-license fingerprinting</h3><p>I'll handle the responsible-adult portion of the morning and get my fingerprints taken while you bravely support my brief career as a person with paperwork. Then we'll be free to return to vacation behavior.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=2888+Loker+Ave+E+Suite+110+Carlsbad+CA+92010" target="_blank" rel="noopener">📍 2888 Loker Ave E, Suite 110, Carlsbad, CA 92010</a><span class="travel">🚗 5 min drive</span></div><div class="pills"><span class="pill check">Confirm before the trip · bring valid government-issued photo ID + completed Request for Live Scan Service form · appointment/time still needs final confirmation · 442-200-1099</span></div></div></div>'''
 
@@ -30,32 +31,26 @@ jobs:
 
           new_breakfast = '''<div class="activity no-media"><div class="content"><div class="time">10:00 AM–12:45 PM</div><h3>Breakfast + flexible Carlsbad time</h3><p>We'll have a slow breakfast and let the morning breathe instead of cramming in another attraction. This is our official window for coffee, wandering, and pretending we don't have a timeshare presentation later.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1901+Wright+Pl+Carlsbad+CA+92008" target="_blank" rel="noopener">📍 Home2 Suites by Hilton Carlsbad · 1901 Wright Pl, Carlsbad, CA 92008</a><span class="travel">🚗 ≈10 min from The UPS Store Village Faire</span></div></div></div>'''
 
-          changed = []
-          for path in files:
-              text = path.read_text()
-              before = text
-              if old_fingerprint in text:
-                  text = text.replace(old_fingerprint, new_fingerprint)
-              elif new_fingerprint not in text:
-                  raise SystemExit(f'Fingerprint block not found in {path}')
-              if old_breakfast in text:
-                  text = text.replace(old_breakfast, new_breakfast)
-              elif new_breakfast not in text:
-                  raise SystemExit(f'Breakfast block not found in {path}')
-              if text != before:
-                  path.write_text(text)
-                  changed.append(str(path))
+          if old_fingerprint in text:
+              text = text.replace(old_fingerprint, new_fingerprint)
+          elif new_fingerprint not in text:
+              raise SystemExit('Fingerprint block not found')
 
-          print('Updated:', ', '.join(changed) if changed else 'already current')
+          if old_breakfast in text:
+              text = text.replace(old_breakfast, new_breakfast)
+          elif new_breakfast not in text:
+              raise SystemExit('Breakfast block not found')
 
-      - name: Commit updates
+          path.write_text(text)
+
+      - name: Commit update
         run: |
-          if git diff --quiet -- index.html .github/workflows/update-thursday.yml; then
+          if git diff --quiet -- index.html; then
             echo "Already current."
             exit 0
           fi
           git config user.name "trip-plan-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html .github/workflows/update-thursday.yml
+          git add index.html
           git commit -m "Update Wednesday Live Scan stop"
           git push origin main
