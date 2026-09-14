@@ -1,4 +1,4 @@
-name: Keep Tuesday itinerary customizations
+name: Keep itinerary customizations synced
 
 on:
   push:
@@ -11,121 +11,121 @@ permissions:
   contents: write
 
 jobs:
-  sync-tuesday:
+  sync-itinerary:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Keep Tuesday reservation move and images applied
+      - name: Keep confirmations and sync source aligned
         shell: python
         run: |
           from pathlib import Path
           import re
 
-          path = Path('index.html')
-          text = path.read_text()
+          index = Path('index.html')
+          text = index.read_text()
 
-          fallback = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80'
-
-          def find_activity(text, title):
-              marker = f'<h3>{title}</h3>'
-              pos = text.find(marker)
-              if pos == -1:
-                  return None
-              start = text.rfind('<div class="activity', 0, pos)
-              depth = 0
-              end = None
-              end_start = None
-              for match in re.finditer(r'<div\b[^>]*>|</div>', text[start:]):
-                  if match.group(0).startswith('<div'):
-                      depth += 1
-                  else:
-                      depth -= 1
-                      if depth == 0:
-                          end_start = start + match.start()
-                          end = start + match.end()
-                          break
-              if end is None:
-                  raise SystemExit(f'Could not parse activity wrapper: {title}')
-              return start, end_start, end
-
-          def replace_activity(text, title, replacement):
-              found = find_activity(text, title)
-              if not found:
-                  raise SystemExit(f'Could not find activity: {title}')
-              start, _, end = found
-              return text[:start] + replacement + text[end:]
-
-          little_italy = '''<div class="activity"><div class="content"><div class="time">6:35–7:35 PM</div><h3>Little Italy wander</h3><p>We'll stroll India Street and the piazzas, browse whatever catches our attention, and soak up the neighborhood before our later dinner reservation in Coronado.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=India+St+and+W+Date+St+San+Diego+CA+92101" target="_blank" rel="noopener">📍 India St &amp; W Date St, San Diego, CA 92101</a><span class="travel">Park once · explore on foot</span></div></div><div class="media"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Little%20Italy%2C%20San%20Diego.jpg?width=1200" alt="Little Italy in San Diego" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
-
-          allegro = '''<div class="activity"><div class="content"><div class="time">7:35–7:55 PM</div><h3>Allegro — Amalfi Lemon Sorbet</h3><p>We'll make the delightfully questionable decision to have the photogenic Amalfi-style lemon sorbet before dinner, then head for Coronado.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1536+India+St+San+Diego+CA+92101" target="_blank" rel="noopener">📍 Allegro Restaurant and Bar · 1536 India St, San Diego, CA 92101</a><span class="travel">Walk within Little Italy</span></div></div><div class="media"><img src="https://cdn.res-menu.net/allegro-restaurant-and-bar/albums-1.jpg" alt="Allegro lemon garden dining room in Little Italy" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
-
-          night_hawk_tuesday = '''<div class="activity no-media"><div class="content"><div class="time">7:55–8:25 PM</div><h3>Drive Little Italy → Night Hawk + arrival buffer</h3><p>We'll cross over to Coronado with enough time to park or use valet and make the reservation without rushing.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1315+Orange+Ave+Coronado+CA+92118" target="_blank" rel="noopener">📍 Night Hawk · 1315 Orange Ave, Coronado, CA 92118</a><span class="travel">≈20 min drive + arrival buffer</span></div></div></div><div class="activity"><div class="content"><div class="time">8:30–10:00 PM</div><h3>Night Hawk — open-air Greek date night</h3><p>We'll settle into the outdoor dining room for a late Greek dinner and let the first night finish somewhere atmospheric instead of trying to squeeze in another neighborhood.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1315+Orange+Ave+Coronado+CA+92118" target="_blank" rel="noopener">📍 Night Hawk · 1315 Orange Ave, Coronado, CA 92118</a></div><div class="pills"><a class="pill reservation" href="https://www.thebabygrandcoronado.com/night-hawk" target="_blank" rel="noopener">✅ Reservation confirmed · Tue Sep 15 · 8:30 PM · 2 guests · outdoor seating</a></div></div><div class="media"><img src="https://www.thebabygrandcoronado.com/_vercel/image?q=90&amp;url=https%3A%2F%2Fcms.thebabygrandcoronado.com%2Fuploads%2Fnhk1.jpg&amp;w=640" alt="Night Hawk — open-air Greek date night" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div><div class="activity no-media"><div class="content"><div class="time">10:00–10:50 PM</div><h3>Drive Night Hawk → Carlsbad hotel</h3><p>After dinner, we'll head straight back to Home2 Suites and call it a very respectable first day.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1901+Wright+Pl+Carlsbad+CA+92008" target="_blank" rel="noopener">📍 Home2 Suites by Hilton Carlsbad · 1901 Wright Pl, Carlsbad, CA 92008</a><span class="travel">≈50 min drive</span></div></div></div>'''
-
-          coronado = '''<div class="activity"><div class="content"><div class="time">5:00–8:30 PM</div><h3>Coronado Village + Hotel del sunset stroll + spontaneous dinner</h3><p>We'll drive to Coronado, wander toward Hotel del and Central Beach for golden hour, then keep the evening flexible and choose dinner somewhere in the Village before heading downtown. It’s a scenic, low-pressure bridge between the afternoon hike and demon mode.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1500+Orange+Ave+Coronado+CA+92118" target="_blank" rel="noopener">📍 Hotel del Coronado · 1500 Orange Ave, Coronado, CA 92118</a><span class="travel">🚗 35 min drive</span></div><div class="pills"><span class="pill alert">Parking note · avoid Hotel del visitor garage unless needed · day-visitor self-parking starts at $39 for first 2 hours · prioritize legal street/residential parking + walking buffer</span></div></div><div class="media"><img src="https://img.sunset02.com/sites/default/files/image/2016/08/main/hotel-del-coronado.jpg" alt="Coronado Village + Hotel del sunset stroll + spontaneous dinner" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
-
-          old_note = 'Day-one energy: land, acquire Porsche, then head downtown for architecture, wandering, Italian food, and a very specific lemon-shaped dessert mission.'
-          new_note = 'Day-one energy: land, acquire Porsche, then head downtown for architecture, wandering, a very specific lemon-shaped dessert mission, and a late Greek dinner in Coronado.'
-
-          # If a Notion sync restores the older Tuesday plan, re-apply the confirmed Night Hawk move.
-          if '<h3>Little Italy wander + spontaneous dinner</h3>' in text:
-              text = text.replace(old_note, new_note, 1)
-              if '<h3>Night Hawk — open-air Greek date night</h3>' in text:
-                  text = replace_activity(text, 'Night Hawk — open-air Greek date night', '')
-              if '<h3>Coronado Village + Hotel del sunset stroll</h3>' in text:
-                  text = replace_activity(text, 'Coronado Village + Hotel del sunset stroll', coronado)
-              text = replace_activity(text, 'Little Italy wander + spontaneous dinner', little_italy)
-              text = replace_activity(text, 'Allegro — Amalfi Lemon Sorbet', allegro)
-              text = replace_activity(text, 'Drive Little Italy → Carlsbad hotel', night_hawk_tuesday)
-
-          targets = {
-              'Scenic Highway 101 drive to Carlsbad + hotel check-in': (
-                  'https://commons.wikimedia.org/wiki/Special:FilePath/Along%20Hwy%20101%20-%20panoramio.jpg?width=1200',
-                  'Scenic Highway 101 along the Encinitas coast'
-              ),
-              'Balboa Park golden-hour wander': (
-                  'https://commons.wikimedia.org/wiki/Special:FilePath/Balboa%20Park%20San%20Diego.jpg?width=1200',
-                  'Balboa Park in San Diego'
-              ),
-              'Little Italy wander': (
-                  'https://commons.wikimedia.org/wiki/Special:FilePath/Little%20Italy%2C%20San%20Diego.jpg?width=1200',
-                  'Little Italy in San Diego'
-              ),
-              'Allegro — Amalfi Lemon Sorbet': (
-                  'https://cdn.res-menu.net/allegro-restaurant-and-bar/albums-1.jpg',
-                  'Allegro lemon garden dining room in Little Italy'
-              ),
-          }
-
-          for title, (image_url, alt) in targets.items():
-              found = find_activity(text, title)
-              if not found:
-                  raise SystemExit(f'Could not find Tuesday activity: {title}')
-              start, end_start, end = found
-              block = text[start:end]
-              if '<div class="media">' in block:
-                  continue
-              opening_end = text.find('>', start) + 1
-              opening = text[start:opening_end].replace('class="activity no-media"', 'class="activity"')
-              media = (
-                  f'<div class="media"><img src="{image_url}" alt="{alt}" '
-                  f'loading="lazy" decoding="async" '
-                  f'onerror="this.onerror=null;this.src=\'{fallback}\'"></div>'
+          # Give every completed booking the same green status treatment.
+          if '.pill.confirmed{' not in text:
+              text = text.replace(
+                  '.pill.reservation{background:#fff0e4;color:#8d512e;border-color:#f1d2bc}',
+                  '.pill.reservation{background:#fff0e4;color:#8d512e;border-color:#f1d2bc}.pill.confirmed{background:#e8f4eb;color:#237a43;border-color:#c9e4d2}',
+                  1,
               )
-              text = text[:start] + opening + text[opening_end:end_start] + media + text[end_start:]
 
-          path.write_text(text)
+          cave_old = '<a class="pill reservation" href="https://oakmountainwinery.com/cave-restaurant/" target="_blank" rel="noopener">Reservation required · 12:30 PM lunch target · reserve an indoor Cave Restaurant table for two · Thursday 12:00–8:00 PM · 951-699-9102</a>'
+          cave_new = '<a class="pill confirmed" href="https://oakmountainwinery.com/cave-restaurant/" target="_blank" rel="noopener">✅ Reservation confirmed · Thu Sep 17 · 12:30 PM · 2 guests · standard seating · 951-699-9102</a>'
+          if cave_old in text:
+              text = text.replace(cave_old, cave_new, 1)
 
-      - name: Commit Tuesday itinerary customizations
+          noches_old = '<a class="pill ticket" href="https://altisimawinery.com/events/noches-latin-jazz/" target="_blank" rel="noopener">Tickets required · Thu Sep 17 · 6:30–9:30 PM · $25/person published admission · limited seating · non-refundable · 951-422-2525</a>'
+          noches_new = '<a class="pill confirmed" href="https://altisimawinery.com/events/noches-latin-jazz/" target="_blank" rel="noopener">✅ TICKETS PURCHASED · Thu Sep 17 · 6:30–9:30 PM · 2 guests · 951-422-2525</a>'
+          if noches_old in text:
+              text = text.replace(noches_old, noches_new, 1)
+
+          # Normalize every existing confirmed reservation / booked item.
+          confirmed = re.compile(r'<a class="pill reservation"([^>]*)>(?:✅\s*)?(Reservation confirmed|BOOKED)([^<]*)</a>')
+          text = confirmed.sub(lambda m: f'<a class="pill confirmed"{m.group(1)}>✅ {m.group(2)}{m.group(3)}</a>', text)
+
+          if cave_new not in text:
+              raise SystemExit('Cave Restaurant confirmation missing after sync')
+          if noches_new not in text:
+              raise SystemExit('Noches de Altísima ticket confirmation missing after sync')
+
+          index.write_text(text)
+
+          # Make the Notion-sync workflow use the exact current Tue/Wed/Thu HTML,
+          # so later syncs cannot restore stale activities or booking states.
+          def extract_day(html, date_label, next_date_label):
+              start_marker = f'<section class="day"><div class="dayhead"><div><div class="date">{date_label}</div>'
+              next_marker = f'<section class="day"><div class="dayhead"><div><div class="date">{next_date_label}</div>'
+              start = html.find(start_marker)
+              end = html.find(next_marker, start)
+              if start == -1 or end == -1:
+                  raise SystemExit(f'Could not extract day: {date_label}')
+              return html[start:end]
+
+          source = Path('.github/workflows/update-thursday.yml')
+          s = source.read_text()
+          for var, date_label, next_label in [
+              ('tuesday', 'Tuesday · September 15', 'Wednesday · September 16'),
+              ('wednesday', 'Wednesday · September 16', 'Thursday · September 17'),
+              ('thursday', 'Thursday · September 17', 'Friday · September 18'),
+          ]:
+              section = extract_day(text, date_label, next_label)
+              marker = f"          {var} = '''"
+              start = s.find(marker)
+              if start == -1:
+                  raise SystemExit(f'Could not find source assignment: {var}')
+              body_start = start + len(marker)
+              end = s.find("'''", body_start)
+              if end == -1:
+                  raise SystemExit(f'Could not find source assignment end: {var}')
+              s = s[:body_start] + section + s[end:]
+
+          audit_start = s.find('          must_have = [')
+          audit_end = s.find('          must_not_have = [', audit_start)
+          if audit_start == -1 or audit_end == -1:
+              raise SystemExit('Could not find source audit block')
+
+          current_audit = """          must_have = [
+              'Scenic Highway 101 drive to Carlsbad + hotel check-in',
+              'Balboa Park golden-hour wander',
+              'Little Italy wander',
+              'Allegro — Amalfi Lemon Sorbet',
+              'Night Hawk — open-air Greek date night',
+              '✅ Reservation confirmed · Tue Sep 15 · 8:30 PM · 2 guests · outdoor seating',
+              'Wildland — rustic Italian date night',
+              '✅ Reservation confirmed · Wed Sep 16 · 6:30 PM · 2 guests · standard dining-room seating',
+              'Campfire — nightcap drinks + dessert',
+              '✅ Reservation confirmed · Wed Sep 16 · 8:30 PM · 2 guests · outdoor heated-patio seating',
+              'The Cave Restaurant at Oak Mountain — wine-country lunch',
+              '✅ Reservation confirmed · Thu Sep 17 · 12:30 PM · 2 guests · standard seating',
+              'Oak Mountain Cave Wine Tasting Tour',
+              'Reservation required · 2:00 PM tour target',
+              'Oak Mountain vineyard decompression',
+              '✅ TICKETS PURCHASED · Thu Sep 17 · 6:30–9:30 PM · 2 guests',
+              '✅ BOOKED · Fri Sep 18 · 2:35 PM pickup · 2 Cruiser Bikes',
+              '✅ Reservation confirmed · Fri Sep 18 · 7:15 PM · 2 guests · standard seating',
+              '✅ Reservation confirmed · Sat Sep 19 · 12:30 PM · 2 guests · standard seating',
+              '✅ Reservation confirmed · Sat Sep 19 · 9:00 PM · 2 guests · table seating',
+              'Ticket required · buy General Admission, not RSVP-only',
+              'Reservation required · 2:15 PM target',
+          ]
+"""
+          s = s[:audit_start] + current_audit + s[audit_end:]
+          source.write_text(s)
+
+      - name: Commit synchronized itinerary
         run: |
-          if git diff --quiet -- index.html; then
-            echo "Tuesday itinerary customizations already match."
+          if git diff --quiet -- index.html .github/workflows/update-thursday.yml; then
+            echo "Itinerary is already synchronized."
             exit 0
           fi
           git config user.name "trip-plan-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html
-          git commit -m "Sync Tuesday Night Hawk reservation and images"
+          git add index.html .github/workflows/update-thursday.yml
+          git commit -m "Sync latest trip confirmations and status pills"
           git push origin main
