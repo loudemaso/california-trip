@@ -1,0 +1,117 @@
+name: Keep Tuesday itinerary images
+
+on:
+  push:
+    paths:
+      - 'index.html'
+      - '.github/workflows/update-thursday.yml'
+      - '.github/workflows/tuesday-images.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  add-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Add relevant images to Tuesday activity cards
+        shell: python
+        run: |
+          from pathlib import Path
+          import re
+
+          path = Path('index.html')
+          text = path.read_text()
+
+          targets = {
+              'Scenic Highway 101 drive to Carlsbad + hotel check-in': (
+                  'https://commons.wikimedia.org/wiki/Special:FilePath/Along%20Hwy%20101%20-%20panoramio.jpg?width=1200',
+                  'Scenic Highway 101 along the Encinitas coast'
+              ),
+              'Balboa Park golden-hour wander': (
+                  'https://commons.wikimedia.org/wiki/Special:FilePath/Balboa%20Park%20San%20Diego.jpg?width=1200',
+                  'Balboa Park in San Diego'
+              ),
+              'Little Italy wander + spontaneous dinner': (
+                  'https://commons.wikimedia.org/wiki/Special:FilePath/Little%20Italy%2C%20San%20Diego.jpg?width=1200',
+                  'Little Italy in San Diego'
+              ),
+              'Allegro — Amalfi Lemon Sorbet': (
+                  'https://cdn.res-menu.net/allegro-restaurant-and-bar/albums-1.jpg',
+                  'Allegro lemon garden dining room in Little Italy'
+              ),
+          }
+
+          fallback = 'https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&fit=crop&w=900&q=80'
+
+          def add_media_to_activity(html, title, image_url, alt):
+              marker = f'<h3>{title}</h3>'
+              pos = html.find(marker)
+              if pos == -1:
+                  raise SystemExit(f'Could not find Tuesday activity: {title}')
+
+              start = html.rfind('<div class="activity', 0, pos)
+              if start == -1:
+                  raise SystemExit(f'Could not find activity wrapper for: {title}')
+
+              depth = 0
+              end_start = None
+              end_pos = None
+              for match in re.finditer(r'<div\b[^>]*>|</div>', html[start:]):
+                  token = match.group(0)
+                  if token.startswith('<div'):
+                      depth += 1
+                  else:
+                      depth -= 1
+                      if depth == 0:
+                          end_start = start + match.start()
+                          end_pos = start + match.end()
+                          break
+
+              if end_start is None:
+                  raise SystemExit(f'Could not parse activity wrapper for: {title}')
+
+              block = html[start:end_pos]
+              if '<div class="media">' in block:
+                  return html, False
+
+              opening_end = html.find('>', start) + 1
+              opening = html[start:opening_end]
+              opening = opening.replace('class="activity no-media"', 'class="activity"')
+
+              media = (
+                  f'<div class="media"><img src="{image_url}" alt="{alt}" '
+                  f'loading="lazy" decoding="async" '
+                  f'onerror="this.onerror=null;this.src=\'{fallback}\'"></div>'
+              )
+
+              html = html[:start] + opening + html[opening_end:end_start] + media + html[end_start:]
+              return html, True
+
+          changed = []
+          for title, (image_url, alt) in targets.items():
+              text, did_change = add_media_to_activity(text, title, image_url, alt)
+              if did_change:
+                  changed.append(title)
+
+          if not changed:
+              print('Tuesday activity images are already present.')
+          else:
+              path.write_text(text)
+              print('Added images to: ' + ', '.join(changed))
+
+      - name: Commit Tuesday image updates
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No image changes needed."
+            exit 0
+          fi
+          git config user.name "trip-plan-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Add images to Tuesday itinerary activities"
+          git push origin main
