@@ -16,93 +16,72 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Apply latest confirmed bookings and pill styling
-        shell: python
+      - name: Patch live itinerary and persistent sync source
         run: |
+          python - <<'PY'
           from pathlib import Path
           import re
 
-          def replace_activity(text, title, replacement):
-              marker = f'<h3>{title}</h3>'
-              pos = text.find(marker)
-              if pos == -1:
-                  if replacement and replacement in text:
-                      return text
-                  raise SystemExit(f'Could not find activity: {title}')
-              start = text.rfind('<div class=', 0, pos)
-              if start == -1:
-                  raise SystemExit(f'Could not find activity wrapper: {title}')
-              depth = 0
-              end = None
-              for match in re.finditer(r'<div\b[^>]*>|</div>', text[start:]):
-                  if match.group(0).startswith('<div'):
-                      depth += 1
-                  else:
-                      depth -= 1
-                      if depth == 0:
-                          end = start + match.end()
-                          break
-              if end is None:
-                  raise SystemExit(f'Could not parse activity wrapper: {title}')
-              return text[:start] + replacement + text[end:]
-
-          def normalize_confirmed_pills(text):
-              # Normal HTML.
-              pat = re.compile(r'<a class="pill reservation"([^>]*)>(?:✅\s*)?(Reservation confirmed|BOOKED|TICKETS PURCHASED)([^<]*)</a>')
-              text = pat.sub(lambda m: f'<a class="pill confirmed"{m.group(1)}>✅ {m.group(2)}{m.group(3)}</a>', text)
-              # HTML embedded in the Python source workflow, where quotes may be escaped.
-              pat_escaped = re.compile(r'<a class=\\"pill reservation\\"([^>]*)>(?:✅\s*)?(Reservation confirmed|BOOKED|TICKETS PURCHASED)([^<]*)</a>')
-              text = pat_escaped.sub(lambda m: f'<a class=\\"pill confirmed\\"{m.group(1)}>✅ {m.group(2)}{m.group(3)}</a>', text)
-              return text
-
-          scenic = '''<div class="activity"><div class="content"><div class="time">2:15–4:15 PM</div><h3>Scenic Highway 101 drive to Carlsbad + hotel check-in</h3><p>Instead of taking I-5 straight north, we'll make the Porsche earn its vacation credentials by following the coast through Torrey Pines, Del Mar, Solana Beach, Cardiff-by-the-Sea and Encinitas before continuing into Carlsbad. We'll treat the drive itself as sightseeing, then check into Home2 Suites and get settled before heading back into San Diego.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1901+Wright+Pl+Carlsbad+CA+92008" target="_blank" rel="noopener">📍 Home2 Suites by Hilton Carlsbad · 1901 Wright Pl, Carlsbad, CA 92008</a><span class="travel">≈1 hr 15–1 hr 30 scenic drive + hotel check-in buffer</span></div></div><div class="media"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Along%20Hwy%20101%20-%20panoramio.jpg?width=1200" alt="Scenic Highway 101 along the Encinitas coast" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
-
-          balboa = '''<div class="activity"><div class="content"><div class="time">5:00–6:20 PM</div><h3>Balboa Park golden-hour wander</h3><p>We'll explore El Prado, the gardens, Spanish Colonial architecture and outdoor spaces rather than trying to squeeze museums into a short first-day visit.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1549+El+Prado+San+Diego+CA+92101" target="_blank" rel="noopener">📍 Balboa Park · 1549 El Prado, San Diego, CA 92101</a><span class="travel">0 min drive</span></div></div><div class="media"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Balboa%20Park%20San%20Diego.jpg?width=1200" alt="Balboa Park in San Diego" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
-
-          little_italy = '''<div class="activity"><div class="content"><div class="time">6:35–7:35 PM</div><h3>Little Italy wander</h3><p>We'll stroll India Street and the piazzas, browse whatever catches our attention, and soak up the neighborhood before our later dinner reservation in Coronado.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=India+St+and+W+Date+St+San+Diego+CA+92101" target="_blank" rel="noopener">📍 India St &amp; W Date St, San Diego, CA 92101</a><span class="travel">Park once · explore on foot</span></div></div><div class="media"><img src="https://commons.wikimedia.org/wiki/Special:FilePath/Little%20Italy%2C%20San%20Diego.jpg?width=1200" alt="Little Italy in San Diego" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
-
-          allegro = '''<div class="activity"><div class="content"><div class="time">7:35–7:55 PM</div><h3>Allegro — Amalfi Lemon Sorbet</h3><p>We'll make the delightfully questionable decision to have the photogenic Amalfi-style lemon sorbet before dinner, then head for Coronado.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1536+India+St+San+Diego+CA+92101" target="_blank" rel="noopener">📍 Allegro Restaurant and Bar · 1536 India St, San Diego, CA 92101</a><span class="travel">Walk within Little Italy</span></div></div><div class="media"><img src="https://cdn.res-menu.net/allegro-restaurant-and-bar/albums-1.jpg" alt="Allegro lemon garden dining room in Little Italy" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
-
-          night_hawk_tuesday = '''<div class="activity no-media"><div class="content"><div class="time">7:55–8:25 PM</div><h3>Drive Little Italy → Night Hawk + arrival buffer</h3><p>We'll cross over to Coronado with enough time to park or use valet and make the reservation without rushing.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1315+Orange+Ave+Coronado+CA+92118" target="_blank" rel="noopener">📍 Night Hawk · 1315 Orange Ave, Coronado, CA 92118</a><span class="travel">≈20 min drive + arrival buffer</span></div></div></div><div class="activity"><div class="content"><div class="time">8:30–10:00 PM</div><h3>Night Hawk — open-air Greek date night</h3><p>We'll settle into the outdoor dining room for a late Greek dinner and let the first night finish somewhere atmospheric instead of trying to squeeze in another neighborhood.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1315+Orange+Ave+Coronado+CA+92118" target="_blank" rel="noopener">📍 Night Hawk · 1315 Orange Ave, Coronado, CA 92118</a></div><div class="pills"><a class="pill confirmed" href="https://www.thebabygrandcoronado.com/night-hawk" target="_blank" rel="noopener">✅ Reservation confirmed · Tue Sep 15 · 8:30 PM · 2 guests · outdoor seating</a></div></div><div class="media"><img src="https://www.thebabygrandcoronado.com/_vercel/image?q=90&amp;url=https%3A%2F%2Fcms.thebabygrandcoronado.com%2Fuploads%2Fnhk1.jpg&amp;w=640" alt="Night Hawk — open-air Greek date night" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div><div class="activity no-media"><div class="content"><div class="time">10:00–10:50 PM</div><h3>Drive Night Hawk → Carlsbad hotel</h3><p>After dinner, we'll head straight back to Home2 Suites and call it a very respectable first day.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=1901+Wright+Pl+Carlsbad+CA+92008" target="_blank" rel="noopener">📍 Home2 Suites by Hilton Carlsbad · 1901 Wright Pl, Carlsbad, CA 92008</a><span class="travel">≈50 min drive</span></div></div></div>'''
-
-          cave = '''<div class="activity"><div class="content"><div class="time">12:15–1:45 PM</div><h3>The Cave Restaurant at Oak Mountain — wine-country lunch</h3><p>We'll have lunch underground among the barrels, which feels like the elegant version of hiding from our responsibilities. Then we’ll head into the cave and see how fancy we can make subterranean day drinking look.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=36522+Via+Verde+Temecula+CA+92592" target="_blank" rel="noopener">📍 Oak Mountain Winery · 36522 Vía Verde, Temecula, CA 92592</a><span class="travel">🚗 10 min drive</span></div><div class="pills"><a class="pill confirmed" href="https://oakmountainwinery.com/cave-restaurant/" target="_blank" rel="noopener">✅ Reservation confirmed · Thu Sep 17 · 12:30 PM · 2 guests · standard seating · 951-699-9102</a></div></div><div class="media"><img src="https://files.gigtown.com/980fc22deeedba7415fc83ddcb077736_ChIJA2WV4md424AROQmDfmzAGaY.jpg" alt="The Cave Restaurant at Oak Mountain — wine-country lunch" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
-
-          noches = '''<div class="activity"><div class="content"><div class="time">6:30–9:30 PM</div><h3>Noches de Altísima — Latin Jazz</h3><p>We'll finish wine country with live Latin jazz, Spanish-inspired atmosphere, wine, and little bites at Noches de Altísima. Less third tasting room, more accidentally glamorous couple who somehow found the best date in the valley.</p><div class="meta"><a class="address" href="https://www.google.com/maps/search/?api=1&amp;query=37440+De+Portola+Rd+Temecula+CA+92592" target="_blank" rel="noopener">📍 37440 De Portola Rd, Temecula, CA 92592</a><span class="travel">🚗 0 min drive</span></div><div class="pills"><a class="pill confirmed" href="https://altisimawinery.com/events/noches-latin-jazz/" target="_blank" rel="noopener">✅ TICKETS PURCHASED · Thu Sep 17 · 6:30–9:30 PM · 2 guests · 951-422-2525</a></div></div><div class="media"><img src="https://gogrape.com/static/upload/wiki/1024x683_Altisima.jpg" alt="Noches de Altísima — Latin Jazz" loading="lazy" decoding="async" onerror="this.onerror=null;this.src='https://images.unsplash.com/photo-1507525428034-b723cf961d3e?auto=format&amp;fit=crop&amp;w=900&amp;q=80'"></div></div>'''
-
-          # Update the live site.
           index = Path('index.html')
           text = index.read_text()
+
           if '.pill.confirmed{' not in text:
-              text = text.replace('.pill.reservation{background:#fff0e4;color:#8d512e;border-color:#f1d2bc}', '.pill.reservation{background:#fff0e4;color:#8d512e;border-color:#f1d2bc}.pill.confirmed{background:#e8f4eb;color:#237a43;border-color:#c9e4d2}', 1)
-          text = replace_activity(text, 'The Cave Restaurant at Oak Mountain — wine-country lunch', cave)
-          text = replace_activity(text, 'Noches de Altísima — Latin Jazz', noches)
-          text = normalize_confirmed_pills(text)
+              text = text.replace(
+                  '.pill.reservation{background:#fff0e4;color:#8d512e;border-color:#f1d2bc}',
+                  '.pill.reservation{background:#fff0e4;color:#8d512e;border-color:#f1d2bc}.pill.confirmed{background:#e8f4eb;color:#237a43;border-color:#c9e4d2}',
+                  1,
+              )
+
+          old = '<a class="pill reservation" href="https://oakmountainwinery.com/cave-restaurant/" target="_blank" rel="noopener">Reservation required · 12:30 PM lunch target · reserve an indoor Cave Restaurant table for two · Thursday 12:00–8:00 PM · 951-699-9102</a>'
+          new = '<a class="pill confirmed" href="https://oakmountainwinery.com/cave-restaurant/" target="_blank" rel="noopener">✅ Reservation confirmed · Thu Sep 17 · 12:30 PM · 2 guests · standard seating · 951-699-9102</a>'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('Could not update Cave Restaurant confirmation')
+
+          old = '<a class="pill ticket" href="https://altisimawinery.com/events/noches-latin-jazz/" target="_blank" rel="noopener">Tickets required · Thu Sep 17 · 6:30–9:30 PM · $25/person published admission · limited seating · non-refundable · 951-422-2525</a>'
+          new = '<a class="pill confirmed" href="https://altisimawinery.com/events/noches-latin-jazz/" target="_blank" rel="noopener">✅ TICKETS PURCHASED · Thu Sep 17 · 6:30–9:30 PM · 2 guests · 951-422-2525</a>'
+          if old in text:
+              text = text.replace(old, new, 1)
+          elif new not in text:
+              raise SystemExit('Could not update Noches de Altísima confirmation')
+
+          confirmed = re.compile(r'<a class="pill reservation"([^>]*)>(?:✅\s*)?(Reservation confirmed|BOOKED)([^<]*)</a>')
+          text = confirmed.sub(lambda m: f'<a class="pill confirmed"{m.group(1)}>✅ {m.group(2)}{m.group(3)}</a>', text)
           index.write_text(text)
 
-          # Repair the persistent Notion-sync source so a later sync cannot revert Tuesday or the new confirmations.
+          def extract_day(html, date_label, next_date_label):
+              start = html.find(f'<section class="day"><div class="dayhead"><div><div class="date">{date_label}</div>')
+              end = html.find(f'<section class="day"><div class="dayhead"><div><div class="date">{next_date_label}</div>', start)
+              if start == -1 or end == -1:
+                  raise SystemExit(f'Could not extract {date_label}')
+              return html[start:end]
+
           source = Path('.github/workflows/update-thursday.yml')
           s = source.read_text()
-          s = s.replace('Day-one energy: land, acquire Porsche, then head downtown for architecture, wandering, Italian food, and a very specific lemon-shaped dessert mission.', 'Day-one energy: land, acquire Porsche, then head downtown for architecture, wandering, a very specific lemon-shaped dessert mission, and a late Greek dinner in Coronado.', 1)
-          s = replace_activity(s, 'Scenic Highway 101 drive to Carlsbad + hotel check-in', scenic)
-          s = replace_activity(s, 'Balboa Park golden-hour wander', balboa)
-          if '<h3>Little Italy wander + spontaneous dinner</h3>' in s:
-              s = replace_activity(s, 'Little Italy wander + spontaneous dinner', little_italy)
-          elif '<h3>Little Italy wander</h3>' not in s:
-              raise SystemExit('Could not reconcile Little Italy source activity')
-          s = replace_activity(s, 'Allegro — Amalfi Lemon Sorbet', allegro)
-          if '<h3>Drive Little Italy → Carlsbad hotel</h3>' in s:
-              s = replace_activity(s, 'Drive Little Italy → Carlsbad hotel', night_hawk_tuesday)
-          elif '<h3>Night Hawk — open-air Greek date night</h3>' not in s:
-              raise SystemExit('Could not reconcile Night Hawk source activities')
-          s = replace_activity(s, 'The Cave Restaurant at Oak Mountain — wine-country lunch', cave)
-          s = replace_activity(s, 'Noches de Altísima — Latin Jazz', noches)
-          s = normalize_confirmed_pills(s)
+
+          for var, date_label, next_label in [
+              ('tuesday', 'Tuesday · September 15', 'Wednesday · September 16'),
+              ('wednesday', 'Wednesday · September 16', 'Thursday · September 17'),
+              ('thursday', 'Thursday · September 17', 'Friday · September 18'),
+          ]:
+              section = extract_day(text, date_label, next_label)
+              start_marker = f"          {var} = '''"
+              start = s.find(start_marker)
+              if start == -1:
+                  raise SystemExit(f'Could not find {var} assignment')
+              body_start = start + len(start_marker)
+              end = s.find("'''", body_start)
+              if end == -1:
+                  raise SystemExit(f'Could not find end of {var} assignment')
+              s = s[:body_start] + section + s[end:]
 
           must_start = s.find('          must_have = [')
           must_end = s.find('          must_not_have = [', must_start)
           if must_start == -1 or must_end == -1:
               raise SystemExit('Could not find reservation audit block')
-          new_must = '''          must_have = [
+
+          new_must = """          must_have = [
               'Scenic Highway 101 drive to Carlsbad + hotel check-in',
               'Balboa Park golden-hour wander',
               'Little Italy wander',
@@ -126,17 +105,18 @@ jobs:
               'Ticket required · buy General Admission, not RSVP-only',
               'Reservation required · 2:15 PM target',
           ]
-'''
+"""
           s = s[:must_start] + new_must + s[must_end:]
           source.write_text(s)
+          PY
 
-      - name: Commit synchronized site and source
+      - name: Commit synchronized itinerary
         run: |
           git config user.name "trip-plan-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html .github/workflows/update-thursday.yml
           if git diff --cached --quiet; then
-            echo "Site and sync source already match the latest itinerary."
+            echo "Everything is already synchronized."
             exit 0
           fi
           git commit -m "Sync latest trip confirmations and status pills"
