@@ -115,3 +115,5 @@ jobs:
           git add index.html
           git commit -m "Add images to Tuesday itinerary activities"
           git push origin main
+
+# Refreshes the published Pages site while preserving the image patcher for future itinerary syncs.
