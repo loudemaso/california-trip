@@ -19,9 +19,9 @@ jobs:
         run: |
           git config user.name "trip-plan-bot"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add index.html .github/workflows/update-thursday.yml
+          git add index.html
           if git diff --cached --quiet; then
-            echo "Everything is already synchronized."
+            echo "The live itinerary is already synchronized."
             exit 0
           fi
           git commit -m "Sync latest trip confirmations and status pills"
