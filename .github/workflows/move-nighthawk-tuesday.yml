@@ -22,8 +22,6 @@ jobs:
           from pathlib import Path
           import re
 
-          files = [Path('index.html'), Path('.github/workflows/update-thursday.yml')]
-
           def replace_activity(text, title, replacement):
               marker = f'<h3>{title}</h3>'
               pos = text.find(marker)
@@ -35,8 +33,7 @@ jobs:
               depth = 0
               end = None
               for match in re.finditer(r'<div\b[^>]*>|</div>', text[start:]):
-                  token = match.group(0)
-                  if token.startswith('<div'):
+                  if match.group(0).startswith('<div'):
                       depth += 1
                   else:
                       depth -= 1
@@ -58,20 +55,25 @@ jobs:
           old_note = 'Day-one energy: land, acquire Porsche, then head downtown for architecture, wandering, Italian food, and a very specific lemon-shaped dessert mission.'
           new_note = 'Day-one energy: land, acquire Porsche, then head downtown for architecture, wandering, a very specific lemon-shaped dessert mission, and a late Greek dinner in Coronado.'
 
-          for path in files:
-              text = path.read_text()
-              if old_note in text:
-                  text = text.replace(old_note, new_note, 1)
-              elif new_note not in text:
-                  raise SystemExit(f'Could not update Tuesday note in {path}')
+          # Update the live HTML, including removing Night Hawk from Saturday.
+          index = Path('index.html')
+          text = index.read_text()
+          text = text.replace(old_note, new_note, 1)
+          text = replace_activity(text, 'Night Hawk — open-air Greek date night', '')
+          text = replace_activity(text, 'Coronado Village + Hotel del sunset stroll', coronado)
+          text = replace_activity(text, 'Little Italy wander + spontaneous dinner', little_italy)
+          text = replace_activity(text, 'Allegro — Amalfi Lemon Sorbet', allegro)
+          text = replace_activity(text, 'Drive Little Italy → Carlsbad hotel', night_hawk_tuesday)
+          index.write_text(text)
 
-              # Remove Night Hawk from Saturday before inserting the new Tuesday block.
-              text = replace_activity(text, 'Night Hawk — open-air Greek date night', '')
-              text = replace_activity(text, 'Coronado Village + Hotel del sunset stroll', coronado)
-              text = replace_activity(text, 'Little Italy wander + spontaneous dinner', little_italy)
-              text = replace_activity(text, 'Allegro — Amalfi Lemon Sorbet', allegro)
-              text = replace_activity(text, 'Drive Little Italy → Carlsbad hotel', night_hawk_tuesday)
-              path.write_text(text)
+          # Persist the Tuesday changes in the Notion-sync source workflow.
+          source = Path('.github/workflows/update-thursday.yml')
+          text = source.read_text()
+          text = text.replace(old_note, new_note, 1)
+          text = replace_activity(text, 'Little Italy wander + spontaneous dinner', little_italy)
+          text = replace_activity(text, 'Allegro — Amalfi Lemon Sorbet', allegro)
+          text = replace_activity(text, 'Drive Little Italy → Carlsbad hotel', night_hawk_tuesday)
+          source.write_text(text)
 
           # Keep the image-preservation workflow compatible with the renamed Tuesday card.
           image_workflow = Path('.github/workflows/tuesday-images.yml')
